@@ -1,0 +1,477 @@
+---
+title: "Reliability Analysis"
+author: "Usman Rashid"
+date: "17/09/2020"
+output:
+  md_document:
+    variant: gfm
+    toc: yes
+    toc_depth: '4'
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: true
+bibliography: bibliography.bib
+csl: apa.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+# function for is nan
+is.nan.data.frame <- function(x)
+  do.call(cbind, lapply(x, is.nan))
+```
+
+```{r data_setup, echo=FALSE, include=FALSE}
+
+# Packages Used:
+require(rptR)
+require(ggpubr)
+require(lme4)
+require(performance)
+require(MuMIn)
+require(boot)
+require(lemon)
+require(insight)
+require(DescTools)
+
+knit_print.data.frame <- lemon_print
+
+# function to obtain ICC from the data 
+icc.glmer.identity <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample
+  val = tryCatch({
+    fit           <- glmer(formula, data = d, family = Gamma(link = "identity"), control = glmerControl(optimizer = "bobyqa"))
+    fixef.fit     <- fixef(fit)
+    beta_nought   <- fixef.fit[1][["(Intercept)"]]
+    sigma.p       <- unlist(VarCorr(fit))[["PID"]]
+    v.fit         <- 1/sigma(fit)^2
+    sigma.r       <- beta_nought^2 / v.fit # Only for the identity link
+    sigma.f       <- stats::var(stats::predict(fit, re.form = NA))
+    icc.value     <- (sigma.p / (sigma.p + sigma.f + sigma.r))
+    sigmas.df     <- data.frame("Sigma.P" = sigma.p, "Sigma.F" = sigma.f, "Sigma.R" = sigma.r)
+    return(icc.value * 100)
+  }, warning = function(warning_condition) {
+    # warning-handler-code
+    return(NA)
+  }, error = function(error_condition) {
+    # error-handler-code
+    return(NA)
+  }, finally={
+    # cleanup-code
+  })
+  return(val)
+}
+
+icc.glmer.identity.noctrl <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample
+  val = tryCatch({
+    fit           <- glmer(formula, data = d, family = Gamma(link = "identity"))
+    fixef.fit     <- fixef(fit)
+    beta_nought   <- fixef.fit[1][["(Intercept)"]]
+    sigma.p       <- unlist(VarCorr(fit))[["PID"]]
+    v.fit         <- 1/sigma(fit)^2
+    sigma.r       <- beta_nought^2 / v.fit # Only for the identity link
+    sigma.f       <- stats::var(stats::predict(fit, re.form = NA))
+    icc.value     <- (sigma.p / (sigma.p + sigma.f + sigma.r))
+    sigmas.df     <- data.frame("Sigma.P" = sigma.p, "Sigma.F" = sigma.f, "Sigma.R" = sigma.r)
+    return(icc.value * 100)
+  }, warning = function(warning_condition) {
+    # warning-handler-code
+    return(NA)
+  }, error = function(error_condition) {
+    # error-handler-code
+    return(NA)
+  }, finally={
+    # cleanup-code
+  })
+  return(val)
+}
+
+# function to obtain ICC from the data 
+sigmas.glmer.identity <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  val = tryCatch({
+    fit           <- glmer(formula, data = d, family = Gamma(link = "identity"), control = glmerControl(optimizer = "bobyqa"))
+    fixef.fit     <- fixef(fit)
+    beta_nought   <- fixef.fit[1][["(Intercept)"]]
+    sigma.p       <- unlist(VarCorr(fit))[["PID"]]
+    v.fit         <- 1/sigma(fit)^2
+    sigma.r       <- beta_nought^2 / v.fit # Only for the identity link
+    sigma.f       <- stats::var(stats::predict(fit, re.form = NA))
+    sigmas.df     <- data.frame("Sigma.P" = sigma.p, "Sigma.F" = sigma.f, "Sigma.R" = sigma.r)
+    return(sigmas.df)
+  }, warning = function(warning_condition) {
+    # warning-handler-code
+    sigmas.df     <- data.frame("Sigma.P" = NA, "Sigma.F" = NA, "Sigma.R" = NA)
+    return(sigmas.df)
+  }, error = function(error_condition) {
+    # error-handler-code
+    sigmas.df     <- data.frame("Sigma.P" = NA, "Sigma.F" = NA, "Sigma.R" = NA)
+    return(sigmas.df)
+  }, finally={
+    # cleanup-code
+  })
+  return(val)
+}
+
+# function to obtain ICC from the data 
+sigmas.glmer.identity.noctrl <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  val = tryCatch({
+    fit           <- glmer(formula, data = d, family = Gamma(link = "identity"))
+    fixef.fit     <- fixef(fit)
+    beta_nought   <- fixef.fit[1][["(Intercept)"]]
+    sigma.p       <- unlist(VarCorr(fit))[["PID"]]
+    v.fit         <- 1/sigma(fit)^2
+    sigma.r       <- beta_nought^2 / v.fit # Only for the identity link
+    sigma.f       <- stats::var(stats::predict(fit, re.form = NA))
+    sigmas.df     <- data.frame("Sigma.P" = sigma.p, "Sigma.F" = sigma.f, "Sigma.R" = sigma.r)
+    return(sigmas.df)
+  }, warning = function(warning_condition) {
+    # warning-handler-code
+    sigmas.df     <- data.frame("Sigma.P" = NA, "Sigma.F" = NA, "Sigma.R" = NA)
+    return(sigmas.df)
+  }, error = function(error_condition) {
+    # error-handler-code
+    sigmas.df     <- data.frame("Sigma.P" = NA, "Sigma.F" = NA, "Sigma.R" = NA)
+    return(sigmas.df)
+  }, finally={
+    # cleanup-code
+  })
+  return(val)
+}
+
+icc.glmer.log <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  val = tryCatch({
+    fit           <- glmer(formula, data = d, family = Gamma(link = "log"), control = glmerControl(optimizer = "bobyqa"))
+    sigma.p       <- unlist(VarCorr(fit))[["PID"]]
+    v.fit         <- 1/sigma(fit)^2
+    sigma.r       <- 1 / v.fit # Only for the log model
+    sigma.f       <- stats::var(stats::predict(fit, re.form = NA))
+    icc.value     <- (sigma.p / (sigma.p + sigma.f + sigma.r))
+    sigmas.df     <- data.frame("Sigma.P" = sigma.p, "Sigma.F" = sigma.f, "Sigma.R" = sigma.r)
+    return(icc.value * 100)
+  }, warning = function(warning_condition) {
+    # warning-handler-code
+    return(NA)
+  }, error = function(error_condition) {
+    # error-handler-code
+    return(NA)
+  }, finally={
+    # cleanup-code
+  })
+  return(val)
+}
+
+# bootstrapping with 1000 replications 
+#results <- boot(data=mtcars, statistic=rsq, 
+#   R=1000, formula=mpg~wt+disp)
+
+# view results
+#results 
+#plot(results)
+
+# get 95% confidence interval 
+#boot.ci(results, type="bca")
+
+
+# Load Full data
+dataSource                  <- read.csv("DataTable.csv")
+dataSource$PID              <- as.factor(dataSource$PID)
+dataSource$Test             <- as.factor(dataSource$Test)
+
+# Bootstrap settings
+nboot.num           <- 2
+```
+
+\newpage
+
+# Statistical Analysis Plan
+Data is imported into R [@forR] for reliability analysis. The normality of the variables is checked with Shapiro-Wilk test. For variables which are normally distributed, a linear mixed model with Gaussian distribution and identity link is setup to estimate between-participant ($\sigma_p^2$), between-test ($\sigma_t^2$) and error (within-participant, $\sigma_{\epsilon}^2$) variance using the \emph{rptR} package [@forrptR]. An ICC for test-retest reliability with absolute agreement using single measures is calculated as described in the following equation [@koo2016guideline]. The confidence interval for the ICC is constructed using 1000 parametric bootstraps.
+
+\begin{equation}
+ICC(A, 1) = \frac{\sigma_p^2}{\sigma_p^2 + \sigma_t^2 + \sigma_{\epsilon}^2}
+\end{equation}
+
+Variables which fail the normality test, two analyses are conducted. First, for an estimate of the ICC on the original scale, a generalised linear mixed model is setup with Gamma distribution and identity link using the \emph{lme4} package [@forlme]. In addition to location (mean) and scale (variance) parameters, Gamma distribution also has a shape parameter allowing it to better fit skewed data. ICC(A, 1) is estimated using the methodology described by @nakagawa2017coefficient where observation-level variance is substituted for error variance ($\sigma_{\epsilon}^2$) in equation 1. The observation-level variance is estimated from the fitted model as follows:
+
+\begin{equation}
+\sigma_{\epsilon}^2 = \frac{\beta_0^2}{\nu}
+\end{equation}
+
+where $\beta_0$ is the overall intercept in the fitted model and $\nu$ is the shape parameter of the fitted Gamma distribution. In the cases where Gamma distribution cannot be used to fit the data, a non-parametric measure of reliability is computed with Lin's concordance correlation coefficient [@steichen2002note],  [@lawrence1989concordance]. The concordance coefficient quantifies the deviation of the observed data from the line of perfect concordance (a line at 45$^o$).
+
+Second, arcsin transformation is used when possible to bring the variable closer to normality. ICC(A, 1) is calculated on the transformed scale using the same procedure described earlier for normal data. The fitness of model to the data is evaluated using QQ-plot and residuals versus fitted values plot.
+
+\emph{Discussion:} The limitation of the transformed scale is that it is generally harder to interpret although it allows application of traditional ANOVAs which assume normality of the data for statistical inference. The advantage of reporting reliability for both the transformed scale and the original scale using two different approaches is that future researchers can choose the scale which better suits their needs.
+
+\newpage
+
+# Summary Statistics
+
+## Data Variables
+```{r summary_stats, echo=FALSE}
+str(dataSource)
+```
+
+## Normality Test
+```{r normal_test, echo=FALSE, render=lemon_print}
+a<-shapiro.test(dataSource$ITT_1)
+d <- data.frame("Variable" = "ITT_1", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- d
+
+a<-shapiro.test(dataSource$ITTAdj_1)
+d <- data.frame("Variable" = "ITTAdj_1", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$CAR_1)
+d <- data.frame("Variable" = "CAR_1", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$ITT_2)
+d <- data.frame("Variable" = "ITT_2", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$CAR_2)
+d <- data.frame("Variable" = "CAR_2", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$CF_ITT)
+d <- data.frame("Variable" = "CF_ITT", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$CF_CAR)
+d <- data.frame("Variable" = "CF_CAR", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$Rest_Tw_AMP_1)
+d <- data.frame("Variable" = "Rest_Tw_AMP_1", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$Sup_Tw_AMP_1)
+d <- data.frame("Variable" = "Sup_Tw_AMP_1", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$Rest_Tw_AMP_2)
+d <- data.frame("Variable" = "Rest_Tw_AMP_2", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+a<-shapiro.test(dataSource$Sup_Tw_AMP_2)
+d <- data.frame("Variable" = "Sup_Tw_AMP_2", "W-statistic" = a$statistic, "P-Value" = a$p.value, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+table.data[, "Sig."] <- table.data$P.Value < 0.05
+
+head(table.data, n = 20L)
+```
+
+
+## ICC Calculations
+
+### Reliability on the Original Scale
+
+Fitting a model with Gamma distribution is not possible for ITT_2 and Sup_Tw_AMP_1 as these contain 0 or negative values. For CF_ITT and CF_CAR, the models failed to converge with a non-negative between-participant variance.
+
+\emph{Note:} The SEMs presented in the below table are on the original scale.
+```{r glmer_icc_va, echo=FALSE, warning=FALSE}
+indices.all         <- seq(1, 24)
+ITT_1.glmer         <- icc.glmer.identity(ITT_1 ~ Test + (1|PID), dataSource, indices.all)
+ITT_1.glmer.sig     <- sigmas.glmer.identity(ITT_1 ~ Test + (1|PID), dataSource, indices.all)
+
+ITTAdj_1.glmer      <- icc.glmer.identity(ITTAdj_1 ~ Test + (1|PID), dataSource, indices.all)
+ITTAdj_1.glmer.sig  <- sigmas.glmer.identity(ITTAdj_1 ~ Test + (1|PID), dataSource, indices.all)
+
+CAR_1.glmer         <- icc.glmer.identity(CAR_1 ~ Test + (1|PID), dataSource, indices.all)
+CAR_1.glmer.sig     <- sigmas.glmer.identity(CAR_1 ~ Test + (1|PID), dataSource, indices.all)
+
+CAR_2.glmer         <- icc.glmer.identity(CAR_2 ~ Test + (1|PID), dataSource, indices.all)
+CAR_2.glmer.sig     <- sigmas.glmer.identity(CAR_2 ~ Test + (1|PID), dataSource, indices.all)
+
+Rest_Tw_AMP_1.norm  <- rpt(Rest_Tw_AMP_1 ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+Rest_Tw_AMP_2.norm  <- rpt(Rest_Tw_AMP_2 ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+
+Sup_Tw_AMP_2.glmer         <- icc.glmer.identity.noctrl(Sup_Tw_AMP_2 ~ Test + (1|PID), dataSource, indices.all)
+Sup_Tw_AMP_2.glmer.sig     <- sigmas.glmer.identity.noctrl(Sup_Tw_AMP_2 ~ Test + (1|PID), dataSource, indices.all)
+
+# bootstrapping with 1000 replications
+
+ITT_1.glmer.bs      <- boot(data=dataSource, statistic=icc.glmer.identity, R=nboot.num, parallel = "multicore", ncpus = 16, formula = ITT_1 ~ Test + (1|PID))
+ITT_1.glmer.bs.ci   <- boot.ci(ITT_1.glmer.bs, type="norm")
+
+ITTAdj_1.glmer.bs   <- boot(data=dataSource, statistic=icc.glmer.identity, R=nboot.num, parallel = "multicore", ncpus = 16, formula = ITTAdj_1 ~ Test + (1|PID))
+ITTAdj_1.glmer.bs.ci<- boot.ci(ITTAdj_1.glmer.bs, type="norm")
+
+CAR_1.glmer.bs      <- boot(data=dataSource, statistic=icc.glmer.identity, R=nboot.num, parallel = "multicore", ncpus = 16, formula = CAR_1 ~ Test + (1|PID))
+CAR_1.glmer.bs.ci   <- boot.ci(CAR_1.glmer.bs, type="norm")
+
+CAR_2.glmer.bs      <- boot(data=dataSource, statistic=icc.glmer.identity, R=nboot.num, parallel = "multicore", ncpus = 16, formula = CAR_2 ~ Test + (1|PID))
+CAR_2.glmer.bs.ci   <- boot.ci(CAR_2.glmer.bs, type="norm")
+
+Sup_Tw_AMP_2.glmer.bs      <- boot(data=dataSource, statistic=icc.glmer.identity.noctrl, R=nboot.num, parallel = "multicore", ncpus = 16, formula = Sup_Tw_AMP_2 ~ Test + (1|PID))
+Sup_Tw_AMP_2.glmer.bs.ci   <- boot.ci(Sup_Tw_AMP_2.glmer.bs, type="norm")
+```
+
+```{r glmer_icc_va_results, echo=FALSE, render=lemon_print}
+model       <- ITT_1.glmer
+model.ci    <- ITT_1.glmer.bs.ci
+model.sigmas<-ITT_1.glmer.sig
+d <- data.frame("Variable" = "ITT_1", "Model" = "Gamma", "ICC" = model, "CI.lower" = model.ci$normal[2], "CI.upper" = model.ci$normal[3], "SEM" = NA, row.names = NULL)
+table.data <- d
+
+model       <- ITTAdj_1.glmer
+model.ci    <- ITTAdj_1.glmer.bs.ci
+model.sigmas<-ITTAdj_1.glmer.sig
+d <- data.frame("Variable" = "ITTAdj_1", "Model" = "Gamma", "ICC" = model, "CI.lower" = model.ci$normal[2], "CI.upper" = model.ci$normal[3], "SEM" = NA, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model       <- CAR_1.glmer
+model.ci    <- CAR_1.glmer.bs.ci
+model.sigmas<-CAR_1.glmer.sig
+d <- data.frame("Variable" = "CAR_1", "Model" = "Gamma", "ICC" = model, "CI.lower" = model.ci$normal[2], "CI.upper" = model.ci$normal[3], "SEM" = NA, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model       <- CAR_2.glmer
+model.ci    <- CAR_2.glmer.bs.ci
+model.sigmas<-CAR_2.glmer.sig
+d <- data.frame("Variable" = "CAR_2", "Model" = "Gamma", "ICC" = model, "CI.lower" = model.ci$normal[2], "CI.upper" = model.ci$normal[3], "SEM" = NA, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- Rest_Tw_AMP_1.norm
+d <- data.frame("Variable" = "Rest_Tw_AMP_1", "Model" = "Gaussian", "ICC" = model$R$PID * 100,
+                "CI.lower" = model$CI_emp$`2.5%` * 100, "CI.upper" = model$CI_emp$`97.5%` * 100, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- Rest_Tw_AMP_2.norm
+d <- data.frame("Variable" = "Rest_Tw_AMP_2", "Model" = "Gaussian", "ICC" = model$R$PID * 100,
+                "CI.lower" = model$CI_emp$`2.5%` * 100, "CI.upper" = model$CI_emp$`97.5%` * 100, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model       <- Sup_Tw_AMP_2.glmer
+model.ci    <- Sup_Tw_AMP_2.glmer.bs.ci
+model.sigmas<-Sup_Tw_AMP_2.glmer.sig
+d <- data.frame("Variable" = "Sup_Tw_AMP_2", "Model" = "Gamma", "ICC" = model, "CI.lower" = model.ci$normal[2], "CI.upper" = model.ci$normal[3], "SEM" = NA, row.names = NULL)
+table.data <- rbind(table.data, d)
+
+table.data[, seq(3, 5)] <- round(table.data[, seq(3, 5)], 1)
+table.data[, 6] <- round(table.data[, 6], 3)
+head(table.data, n = 20L)
+```
+
+### Non-parametric Concordance Correlation Coefficient
+
+Negative values for reliability suggest that the participants are more different than the average similarity level obtained from random measurements [@forrptR]. In other words, negative values are an evidence of zero (poor) reliability.
+
+```{r nonparam_itt_2, echo=FALSE, warning=FALSE, render=lemon_print}
+ccc.ITT_2       <- CCC(subset(dataSource, Test == 1)$ITT_2, subset(dataSource, Test == 2)$ITT_2)
+ccc.CF_ITT      <- CCC(subset(dataSource, Test == 1)$CF_ITT, subset(dataSource, Test == 2)$CF_ITT)
+ccc.CF_CAR      <- CCC(subset(dataSource, Test == 1)$CF_CAR, subset(dataSource, Test == 2)$CF_CAR)
+ccc.Sup_Tw_AMP_1      <- CCC(subset(dataSource, Test == 1)$Sup_Tw_AMP_1, subset(dataSource, Test == 2)$Sup_Tw_AMP_1)
+
+d <- data.frame("Variable" = "ITT_2", "CCC" = round(ccc.ITT_2$rho.c$est * 100, 1), "CI.lower" = round(ccc.ITT_2$rho.c$lwr.ci * 100, 1), "CI.upper" = round(ccc.ITT_2$rho.c$upr.ci * 100, 1), row.names = NULL)
+table.data <- d
+
+d <- data.frame("Variable" = "CF_ITT", "CCC" = round(ccc.CF_ITT$rho.c$est * 100, 1), "CI.lower" = round(ccc.CF_ITT$rho.c$lwr.ci * 100, 1), "CI.upper" = round(ccc.CF_ITT$rho.c$upr.ci * 100, 1), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+d <- data.frame("Variable" = "CF_CAR", "CCC" = round(ccc.CF_CAR$rho.c$est * 100, 1), "CI.lower" = round(ccc.CF_CAR$rho.c$lwr.ci * 100, 1), "CI.upper" = round(ccc.CF_CAR$rho.c$upr.ci * 100, 1), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+d <- data.frame("Variable" = "Sup_Tw_AMP_1", "CCC" = round(ccc.Sup_Tw_AMP_1$rho.c$est * 100, 1), "CI.lower" = round(ccc.Sup_Tw_AMP_1$rho.c$lwr.ci * 100, 1), "CI.upper" = round(ccc.Sup_Tw_AMP_1$rho.c$upr.ci * 100, 1), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+head(table.data)
+```
+
+### Reliability on the Arcsin Transformed Scale
+The variables are transformed as follows [@warton2011arcsine]:
+
+\begin{equation}
+X_t = asin\bigg(\sqrt{{\frac{X_o}{100}}}\bigg)
+\end{equation}
+
+Arcsin transformation is not possible for ITT_2, CF_ITT and CF_CAR as these variables contain negative values for which arcsin is not defined.
+
+\emph{Note:} The SEMs presented in the below table are for the transformed scale.
+```{r asin_icc_va, echo=FALSE}
+ITT_1.asin        <- rpt(asin(sqrt(ITT_1/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+ITTAdj_1.asin     <- rpt(asin(sqrt(ITTAdj_1/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+CAR_1.asin        <- rpt(asin(sqrt(CAR_1/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+
+CAR_2.asin        <- rpt(asin(sqrt(CAR_2/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+
+Sup_Tw_AMP_1.asin        <- rpt(asin(sqrt(Sup_Tw_AMP_1/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+Sup_Tw_AMP_2.asin        <- rpt(asin(sqrt(Sup_Tw_AMP_2/100)) ~ Test + (1|PID), grname = "PID", data = dataSource, datatype = "Gaussian", adjusted = FALSE, parallel = TRUE)
+```
+
+```{r asin_icc_va_results, echo=FALSE, render=lemon_print}
+model <- ITT_1.asin
+d <- data.frame("Variable" = "ITT_1", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- d
+
+model <- ITTAdj_1.asin
+d <- data.frame("Variable" = "ITTAdj_1", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- CAR_1.asin
+d <- data.frame("Variable" = "CAR_1", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- CAR_2.asin
+d <- data.frame("Variable" = "CAR_2", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- Sup_Tw_AMP_1.asin
+d <- data.frame("Variable" = "Sup_Tw_AMP_1", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+model <- Sup_Tw_AMP_2.asin
+d <- data.frame("Variable" = "Sup_Tw_AMP_2", "ICC" = model$R$PID,
+                "CI.lower" = model$CI_emp$`2.5%`, "CI.upper" = model$CI_emp$`97.5%`, "SEM" = sigma(model["mod"]$mod), row.names = NULL)
+table.data <- rbind(table.data, d)
+
+table.data[, seq(2, 4)] <- round(table.data[, seq(2, 4)] * 100, 1)
+
+table.data[, 5] <- round(table.data[, 5], 3)
+
+head(table.data)
+```
+
+\newpage
+
+#### Goodness-of-the-fit plots for the Model
+
+Arcsin transformed CAR_2 has a larger number of outliers compared to the other measures.
+
+```{r asin_icc_va_plots, echo=FALSE}
+plot(ITT_1.asin["mod"]$mod, xlab = 'Fitted values for ITT_1', ylab = 'Residuals')
+ggqqplot(resid(ITT_1.asin["mod"]$mod)) + ylab('Residuals for ITT_1')
+
+plot(ITTAdj_1.asin["mod"]$mod, xlab = 'Fitted values for ITTAdj_1', ylab = 'Residuals')
+ggqqplot(resid(ITTAdj_1.asin["mod"]$mod)) + ylab('Residuals for ITTAdj_1')
+
+plot(CAR_1.asin["mod"]$mod, xlab = 'Fitted values for CAR_1', ylab = 'Residuals')
+ggqqplot(resid(CAR_1.asin["mod"]$mod)) + ylab('Residuals for CAR_1')
+
+plot(CAR_2.asin["mod"]$mod, xlab = 'Fitted values for CAR_2', ylab = 'Residuals')
+ggqqplot(resid(CAR_2.asin["mod"]$mod)) + ylab('Residuals for CAR_2')
+
+plot(Sup_Tw_AMP_1.asin["mod"]$mod, xlab = 'Fitted values for Sup_Tw_AMP_1', ylab = 'Residuals')
+ggqqplot(resid(Sup_Tw_AMP_1.asin["mod"]$mod)) + ylab('Residuals for Sup_Tw_AMP_1')
+
+plot(Sup_Tw_AMP_2.asin["mod"]$mod, xlab = 'Fitted values for Sup_Tw_AMP_2', ylab = 'Residuals')
+ggqqplot(resid(Sup_Tw_AMP_2.asin["mod"]$mod)) + ylab('Residuals for Sup_Tw_AMP_2')
+```
+
+\newpage
+
+
+# References
